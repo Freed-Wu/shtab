@@ -2,7 +2,7 @@ default_language_version:
   python: python3
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.4.0
+  rev: v5.0.0
   hooks:
   - id: check-added-large-files
   - id: check-builtin-literals
@@ -27,7 +27,7 @@ repos:
     types: [text]
     exclude: ^(.pre-commit-config.yaml|.github/workflows/test.yml)$
 - repo: https://github.com/PyCQA/flake8
-  rev: 6.1.0
+  rev: 7.1.1
   hooks:
   - id: flake8
     args: [-j8]
@@ -40,18 +40,18 @@ repos:
     - flake8-pyproject
     - flake8-string-format
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.5.1
+  rev: v1.14.1
   hooks:
   - id: mypy
     additional_dependencies: [types-setuptools]
 - repo: https://github.com/google/yapf
-  rev: v0.40.0
+  rev: v0.43.0
   hooks:
   - id: yapf
     args: [-i]
     additional_dependencies: [toml]
 - repo: https://github.com/PyCQA/isort
-  rev: 5.12.0
+  rev: 5.13.2
   hooks:
   - id: isort
 ci:

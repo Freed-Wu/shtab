@@ -129,8 +129,8 @@ def complete2pattern(opt_complete, shell: str, choice_type2fn) -> str:
 
 
 def wordify(string: str) -> str:
-    """Replace non-word chars [-. :] with underscores [_]"""
-    return re.sub(r"[-.\s:]", "_", string)
+    """Replace non-word chars [\\W] with underscores [_]"""
+    return re.sub("\\W", "_", string)
 
 
 def get_public_subcommands(sub):
@@ -368,7 +368,7 @@ _set_new_action() {
     current_action_nargs=1
   fi
 
-  current_action_args_start_index=$(( $word_index + 1 ))
+  current_action_args_start_index=$(( $word_index + 1 - $pos_only ))
 
   current_action_is_positional=$2
 }
@@ -395,6 +395,7 @@ ${root_prefix}() {
 
   local prefix=${root_prefix}
   local word_index=0
+  local pos_only=0 # "--" delimeter not encountered yet
   _set_parser_defaults
   word_index=1
 
@@ -403,26 +404,30 @@ ${root_prefix}() {
   while [ $word_index -ne $COMP_CWORD ]; do
     local this_word="${COMP_WORDS[$word_index]}"
 
-    if [[ -n $sub_parsers && " ${sub_parsers[@]} " == *" ${this_word} "* ]]; then
-      # valid subcommand: add it to the prefix & reset the current action
-      prefix="${prefix}_$(_shtab_replace_nonword $this_word)"
-      _set_parser_defaults
-    fi
+    if [[ $pos_only = 1 || " $this_word " != " -- " ]]; then
+      if [[ -n $sub_parsers && " ${sub_parsers[@]} " == *" ${this_word} "* ]]; then
+        # valid subcommand: add it to the prefix & reset the current action
+        prefix="${prefix}_$(_shtab_replace_nonword $this_word)"
+        _set_parser_defaults
+      fi
 
-    if [[ " ${current_option_strings[@]} " == *" ${this_word} "* ]]; then
-      # a new action should be acquired (due to recognised option string or
-      # no more input expected from current action);
-      # the next positional action can fill in here
-      _set_new_action $this_word false
-    fi
+      if [[ " ${current_option_strings[@]} " == *" ${this_word} "* ]]; then
+        # a new action should be acquired (due to recognised option string or
+        # no more input expected from current action);
+        # the next positional action can fill in here
+        _set_new_action $this_word false
+      fi
 
-    if [[ "$current_action_nargs" != "*" ]] && \\
-       [[ "$current_action_nargs" != "+" ]] && \\
-       [[ "$current_action_nargs" != *"..." ]] && \\
-       (( $word_index + 1 - $current_action_args_start_index >= \\
-          $current_action_nargs )); then
-      $current_action_is_positional && let "completed_positional_actions += 1"
-      _set_new_action "pos_${completed_positional_actions}" true
+      if [[ "$current_action_nargs" != "*" ]] && \\
+         [[ "$current_action_nargs" != "+" ]] && \\
+         [[ "$current_action_nargs" != *"..." ]] && \\
+         (( $word_index + 1 - $current_action_args_start_index - $pos_only >= \\
+            $current_action_nargs )); then
+        $current_action_is_positional && let "completed_positional_actions += 1"
+        _set_new_action "pos_${completed_positional_actions}" true
+      fi
+    else
+      pos_only=1 # "--" delimeter encountered
     fi
 
     let "word_index+=1"
@@ -430,7 +435,7 @@ ${root_prefix}() {
 
   # Generate the completions
 
-  if [[ "${completing_word}" == -* ]]; then
+  if [[ $pos_only = 0 && "${completing_word}" == -* ]]; then
     # optional argument started: use option strings
     COMPREPLY=( $(compgen -W "${current_option_strings[*]}" -- "${completing_word}") )
   else
@@ -659,7 +664,15 @@ ${command_cases}
 ${preamble}
 
 typeset -A opt_args
-${root_prefix} "$@\"""").safe_substitute(
+
+if [[ $zsh_eval_context[-1] == eval ]]; then
+  # eval/source/. command, register function for later
+  compdef ${root_prefix} -N ${prog}
+else
+  # autoload from fpath, call function directly
+  ${root_prefix} "$@\"
+fi
+""").safe_substitute(
         prog=prog,
         root_prefix=root_prefix,
         command_cases="\n".join(starmap(command_case, sorted(subcommands.items()))),

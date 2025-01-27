@@ -107,7 +107,8 @@ def test_prog_scripts(shell, caplog, capsys):
     elif shell == "zsh":
         assert script_py == [
             "#compdef script.py", "_describe 'script.py commands' _commands",
-            "_shtab_shtab_options+=(': :_shtab_shtab_commands' '*::: :->script.py')", "script.py)"]
+            "_shtab_shtab_options+=(': :_shtab_shtab_commands' '*::: :->script.py')", "script.py)",
+            "compdef _shtab_shtab -N script.py"]
     elif shell == "tcsh":
         assert script_py == ["complete script.py \\"]
     else:
@@ -241,6 +242,25 @@ def test_subparser_colons(shell, caplog):
 
 
 @fix_shell
+def test_subparser_slashes(shell, caplog):
+    parser = ArgumentParser(prog="test")
+    subparsers = parser.add_subparsers()
+    subparsers.add_parser("sub/cmd", help="help message")
+    with caplog.at_level(logging.INFO):
+        completion = shtab.complete(parser, shell=shell)
+    print(completion)
+
+    if shell == "bash":
+        shell = Bash(completion)
+        shell.compgen('-W "${_shtab_test_subparsers[*]}"', "s", "sub/cmd")
+        shell.compgen('-W "${_shtab_test_pos_0_choices[*]}"', "s", "sub/cmd")
+        shell.test('-z "${_shtab_test_COMPGEN-}"')
+    elif shell == "zsh":
+        assert "_shtab_test_sub/cmd" not in completion
+        assert "_shtab_test_sub_cmd" in completion
+
+
+@fix_shell
 def test_add_argument_to_optional(shell, caplog):
     parser = ArgumentParser(prog="test")
     shtab.add_argument_to(parser, ["-s", "--shell"])
@@ -271,7 +291,7 @@ def test_add_argument_to_positional(shell, caplog, capsys):
             assert exc.value.code == 0
     completion, err = capsys.readouterr()
     print(completion)
-    assert completion_manual == completion.rstrip()
+    assert completion_manual.rstrip() == completion.rstrip()
     assert not err
 
     if shell == "bash":
